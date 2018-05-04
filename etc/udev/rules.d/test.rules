@@ -1,0 +1,26 @@
+KERNEL!="sd[a-z][0-9]", GOTO="media_by_label_auto_mount_end"
+ACTION=="add", PROGRAM!="/sbin/blkid %N", GOTO="media_by_label_auto_mount_end"
+
+# Do not mount devices already mounted somewhere else to avoid entries for all your local partitions in /media
+ACTION=="add", PROGRAM=="/bin/grep -q ' /dev/%k ' /proc/self/mountinfo", GOTO="media_by_label_auto_mount_end"
+
+# Global mount options
+ACTION=="add", ENV{mount_options}="noatime"
+# Filesystem-specific mount options
+ACTION=="add", PROGRAM=="/sbin/blkid -o value -s TYPE %E{device}", RESULT=="vfat|ntfs", ENV{mount_options}="%E{mount_options},utf8,gid=100,umask=002"
+
+# Get label if present, otherwise assign one
+ENV{ID_FS_LABEL}!="", ENV{dir_name}="%E{ID_FS_LABEL}"  
+ENV{ID_FS_LABEL}=="", ENV{dir_name}="usbhd-%k"
+
+# Mount the device
+ACTION=="add", ENV{dir_name}!="", RUN+="/bin/mkdir -p '/media/%E{dir_name}'", RUN+="/bin/mount -o %E{mount_options} /dev/%k '/media/%E{dir_name}'"
+
+# Clean up after removal
+ACTION=="remove", ENV{dir_name}!="", RUN+="/bin/umount -l '/media/%E{dir_name}'"
+ACTION=="remove", ENV{dir_name}!="", RUN+="/bin/rmdir '/media/%E{dir_name}'"
+
+# Exit
+LABEL="media_by_label_auto_mount_end"
+
+
