@@ -2,9 +2,15 @@
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GObject
+import signal
 import os
 import subprocess
-#import cgi
+
+## TODO:
+## - display copy progress
+## - update on signal
+## - icons instead of text on the buttons
+## - localization, defaulting to english
 
 class MyWindow(Gtk.Window):
     def __init__(self):
@@ -78,6 +84,12 @@ class MyWindow(Gtk.Window):
         ## quit cleanly when the windows is closed
         ## otherwise the process just keeps hanging		
         self.connect("delete-event", self.mainQuit)
+        ## TODO: update display on signal
+        ## https://pymotw.com/2/signal/
+        signal.signal(signal.SIGUSR1, self.receive_signal_usr1)
+
+    def receive_signal_usr1(self, signum, stack):
+        self.updateStatus()
 
     def on_systemButtonUpdate_clicked(self, b):
         self.updateStatus()
@@ -86,8 +98,12 @@ class MyWindow(Gtk.Window):
         subprocess.call(["sudo", "shutdown", "-h", "now"])
 
     def on_statusButtonStart_clicked(self, b):
-        # rsync -a D2AA-545F /media/pi/backup01/
-        #subprocess.call(["sudo", "umount", self.sourcePath])
+        self.sourceButtonEject.set_sensitive(False)
+        self.targetButtonEject.set_sensitive(False)
+        self.statusButtonStart.set_sensitive(False)
+        subprocess.call(["sudo", "rsync", "--info=progress2", "-a", self.sourcePath, self.targetPath])
+        ## TODO: progress display
+        # https://gist.github.com/JohannesBuchner/4d61eb5a42aeaad6ce90
         self.updateStatus()
 
     def on_sourceButtonEject_clicked(self, b):
@@ -110,15 +126,16 @@ class MyWindow(Gtk.Window):
                 total = stat.f_blocks*stat.f_bsize
                 free = stat.f_bfree*stat.f_bsize
                 used = (stat.f_blocks-stat.f_bfree)*stat.f_bsize
+                percent = float(used)/float(total)
                 if dir.startswith('backup'):
                     self.targetLabel.set_text("Ziel: " + dir)
-                    self.targetProgressBar.set_fraction(free/total)
+                    self.targetProgressBar.set_fraction(percent)
                     self.targetProgressBar.set_text("%s frei" % self.sizeof_fmt(free))
                     self.targetPath = dirpath
                     self.targetButtonEject.set_sensitive(True)
                 else:
                     self.sourceLabel.set_text("Quelle: " + dir)
-                    self.sourceProgressBar.set_fraction(free/total)
+                    self.sourceProgressBar.set_fraction(percent)
                     self.sourceProgressBar.set_text("%s frei" % self.sizeof_fmt(free))
                     self.sourcePath = dirpath
                     self.sourceButtonEject.set_sensitive(True)
