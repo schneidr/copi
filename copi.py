@@ -5,6 +5,10 @@ from gi.repository import Gtk, GObject
 import signal
 import os
 import subprocess
+import re
+import threading
+import gtk
+GObject.threads_init()
 
 ## TODO:
 ## - display copy progress
@@ -16,7 +20,7 @@ class MyWindow(Gtk.Window):
     def __init__(self):
         Gtk.Window.__init__(self, title="coPi")
         self.set_border_width(3)
-        
+
         grid = Gtk.Grid()
         self.add(grid)
 
@@ -98,13 +102,8 @@ class MyWindow(Gtk.Window):
         subprocess.call(["sudo", "shutdown", "-h", "now"])
 
     def on_statusButtonStart_clicked(self, b):
-        self.sourceButtonEject.set_sensitive(False)
-        self.targetButtonEject.set_sensitive(False)
-        self.statusButtonStart.set_sensitive(False)
-        subprocess.call(["sudo", "rsync", "--info=progress2", "-a", self.sourcePath, self.targetPath])
-        ## TODO: progress display
-        # https://gist.github.com/JohannesBuchner/4d61eb5a42aeaad6ce90
-        self.updateStatus()
+        self.statusProgressBar.set_text("Kopiere...")
+        threading.Thread(target=self.copy).start()
 
     def on_sourceButtonEject_clicked(self, b):
         subprocess.call(["sudo", "umount", self.sourcePath])
@@ -112,6 +111,33 @@ class MyWindow(Gtk.Window):
 
     def on_targetButtonEject_clicked(self, b):
         subprocess.call(["sudo", "umount", self.targetPath])
+        self.updateStatus()
+
+    def copy(self):
+        self.sourceButtonEject.set_sensitive(False)
+        self.targetButtonEject.set_sensitive(False)
+        self.statusButtonStart.set_sensitive(False)
+        ## TODO: progress display
+        # https://gist.github.com/JohannesBuchner/4d61eb5a42aeaad6ce90
+        cmd = "sudo rsync --info=progress2 -a %s %s" % (self.sourcePath, self.targetPath)
+        proc = subprocess.Popen(cmd,
+                                   shell=True,
+                                   stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE,
+                                   )
+        while True:
+            output = proc.stdout.readline()
+            if not output:
+                break
+            print output
+            m = re.findall(r'(\d+)%', output)
+            if m:
+                progress = int(m[0][0])
+                progress_float = progress / 100.0
+                self.statusProgressBar.set_text("%d%%" % progress);
+                self.statusProgressBar.set_fraction(progress_float)
+                print progress_float
+        self.statusProgressBar.set_text("Fertig")
         self.updateStatus()
 
     def updateStatus(self):
