@@ -10,7 +10,6 @@ import threading
 GObject.threads_init()
 
 ## TODO:
-## - display copy progress
 ## - update on signal
 ## - icons instead of text on the buttons
 ## - localization, defaulting to english
@@ -19,7 +18,6 @@ class MyWindow(Gtk.Window):
     def __init__(self):
         Gtk.Window.__init__(self, title="coPi")
         self.set_border_width(3)
-
         grid = Gtk.Grid()
         self.add(grid)
 
@@ -101,8 +99,8 @@ class MyWindow(Gtk.Window):
         subprocess.call(["sudo", "shutdown", "-h", "now"])
 
     def on_statusButtonStart_clicked(self, b):
-        #threading.Thread(target=self.copy).start()
-        self.copy()
+        threading.Thread(target=self.copy).start()
+        #self.copy()
 
     def on_sourceButtonEject_clicked(self, b):
         subprocess.call(["sudo", "umount", self.sourcePath])
@@ -114,11 +112,9 @@ class MyWindow(Gtk.Window):
 
     def copy(self):
         print "Kopiere"
-        self.statusProgressBar.set_text("Kopiere...")
-        self.sourceButtonEject.set_sensitive(False)
-        self.targetButtonEject.set_sensitive(False)
-        self.statusButtonStart.set_sensitive(False)
-        ## TODO: progress display
+        GObject.idle_add(self.sourceButtonEject.set_sensitive, False)
+        GObject.idle_add(self.targetButtonEject.set_sensitive, False)
+        GObject.idle_add(self.statusButtonStart.set_sensitive, False)
         # https://gist.github.com/JohannesBuchner/4d61eb5a42aeaad6ce90
         cmd = "sudo rsync --info=progress2 -a %s %s" % (self.sourcePath, self.targetPath)
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, universal_newlines=True)
@@ -127,15 +123,14 @@ class MyWindow(Gtk.Window):
             if m:
                 progress = int(m[0])
                 progress_float = progress / 100.0
-                self.statusProgressBar.set_text("%d%%" % progress);
-                self.statusProgressBar.set_fraction(progress_float)
+                GObject.idle_add(self.statusProgressBar.set_text, "%d%%" % progress)
+                GObject.idle_add(self.statusProgressBar.set_fraction, progress_float)
         proc.stdout.close()
         return_code = proc.wait()
-        self.statusProgressBar.set_text("Fertig")
-        self.sourceButtonEject.set_sensitive(True)
-        self.targetButtonEject.set_sensitive(True)
-        self.statusButtonStart.set_sensitive(True)
-        self.updateStatus()
+        GObject.idle_add(self.sourceButtonEject.set_sensitive, True)
+        GObject.idle_add(self.targetButtonEject.set_sensitive, True)
+        GObject.idle_add(self.statusButtonStart.set_sensitive, True)
+        GObject.idle_add(self.updateStatus)
 
     def updateStatus(self):
         path = "/media/pi"
