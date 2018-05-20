@@ -17,6 +17,7 @@ GObject.threads_init()
 class MyWindow(Gtk.Window):
     def __init__(self):
         Gtk.Window.__init__(self, title="coPi")
+        Gtk.Window.fullscreen(self)
         self.set_border_width(3)
         grid = Gtk.Grid()
         self.add(grid)
@@ -133,7 +134,7 @@ class MyWindow(Gtk.Window):
         GObject.idle_add(self.updateStatus)
 
     def updateStatus(self):
-        path = "/media/pi"
+        path = "/media"
         dirs = os.listdir(path)
         self.sourcePath = None
         self.targetPath = None
